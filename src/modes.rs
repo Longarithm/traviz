@@ -147,6 +147,9 @@ pub fn add_height_to_name(s: &mut Span) {
     if let Some(val) = s.attributes.get("block_height") {
         s.name = format!("{} H={}", s.name, value_to_text(val));
     }
+    if let Some(val) = s.attributes.get("target_height") {
+        s.name = format!("{} H={}", s.name, value_to_text(val));
+    }
     if let Some(val) = s.attributes.get("height_created") {
         s.name = format!("{} HC={}", s.name, value_to_text(val));
     }
@@ -241,6 +244,41 @@ fn extract_spans(requests: &[ExportTraceServiceRequest]) -> Result<Vec<Rc<Span>>
                             time: time_point_from_unix_nano(event.time_unix_nano),
                             attributes,
                         });
+                    }
+
+                    // Promote selected event data to span attributes for display/matching
+                    // - Mark presence of `send_block_approval` so modes can match on it
+                    // - If span lacks any height-like attribute, copy `target_height` from that event
+                    let has_send_block_approval =
+                        events.iter().any(|e| e.name == "send_block_approval");
+                    if has_send_block_approval {
+                        // Presence flag used by structured modes
+                        attributes.insert(
+                            "has_event.send_block_approval".to_string(),
+                            Some(Value::BoolValue(true)),
+                        );
+
+                        // Detect if span already has a meaningful height value
+                        let has_any_height_value = attributes
+                                .get("target_height")
+                                .and_then(|v| v.as_ref())
+                                .is_some();
+
+                        if !has_any_height_value {
+                            if let Some(target_height_opt) = events
+                                .iter()
+                                .find(|e| e.name == "send_block_approval")
+                                .and_then(|e| e.attributes.get("target_height"))
+                                .cloned()
+                            {
+                                if target_height_opt.is_some() {
+                                    attributes.insert(
+                                        "target_height".to_string(),
+                                        target_height_opt,
+                                    );
+                                }
+                            }
+                        }
                     }
 
                     spans_by_id.insert(

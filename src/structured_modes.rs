@@ -197,6 +197,31 @@ pub fn chain_structured_mode() -> StructuredMode {
             show_span("validate_chunk_endorsement"),
             show_span("on_approval_message"),
             show_span("send_chunk_endorsement"),
+            // Show try_doomslug_timer only when send_block_approval event was recorded
+            SpanRule {
+                name: "Show try_doomslug_timer when send_block_approval happened".to_string(),
+                selector: SpanSelector {
+                    span_name_condition: MatchCondition {
+                        operator: MatchOperator::EqualTo,
+                        value: "try_doomslug_timer".to_string(),
+                    },
+                    node_name_condition: MatchCondition::any(),
+                    attribute_conditions: vec![
+                        (
+                            "has_event.send_block_approval".to_string(),
+                            MatchCondition::equal_to("true"),
+                        ),
+                    ],
+                },
+                decision: SpanDecision {
+                    visible: true,
+                    display_length: DisplayLength::Text,
+                    replace_name: String::new(),
+                    add_height_to_name: true,
+                    add_shard_id_to_name: true,
+                    group: false,
+                },
+            },
         ],
         is_builtin: true,
     }
